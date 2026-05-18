@@ -251,15 +251,13 @@ async def slash_draw(interaction: discord.Interaction, count: int = 1):
             ping = name if is_mention(name) else None
             await interaction.followup.send(content=ping, embed=reveal_em)
 
-        # Group summary — embeds render mentions as @username without re-pinging
-        summary_lines = "\n".join(
-            f"  {medal(i)}  {n}" for i, n in enumerate(drawn)
-        )
+        # Group summary — use plain description (no code block) so mentions resolve to @username
         summary_em = discord.Embed(
             title=f"✅  Group {group_num} complete!",
-            description=f"```\n{summary_lines}\n```",
             color=C_GREEN,
         )
+        for si, sn in enumerate(drawn):
+            summary_em.add_field(name=f"{medal(si)}  Slot {si + 1}", value=sn, inline=True)
         summary_em.set_footer(text=pool_footer() + "  ·  /groups to see all")
 
         # Add a small pause between groups (before next group's separator)
@@ -306,12 +304,12 @@ async def slash_drawremaining(interaction: discord.Interaction):
     pool.clear()
     wheel["groups"][group_num] = drawn
 
-    names_list = "\n".join(f"  🏅  {n}" for n in drawn)
     em = discord.Embed(
         title=f"✅  Group {group_num}  (partial — {len(drawn)} name(s))",
-        description=f"```\n{names_list}\n```",
         color=C_GREEN,
     )
+    for si, sn in enumerate(drawn):
+        em.add_field(name=f"🏅  Slot {si + 1}", value=sn, inline=True)
     em.set_footer(text="Pool is now empty  ·  /groups to see all results  ·  /reset to start over")
     await interaction.response.send_message(embed=em)
 
