@@ -68,6 +68,16 @@ MEDALS = ["🥇", "🥈", "🥉"]
 def medal(i):
     return MEDALS[i] if i < 3 else "🏅"
 
+import re
+MENTION_RE = re.compile(r"^<@!?(\d+)>$")
+
+def is_mention(name: str) -> bool:
+    return bool(MENTION_RE.match(name.strip()))
+
+def display_name(name: str) -> str:
+    """For embeds: show the raw mention string in a code block so it doesn't ping twice."""
+    return f"`{name}`" if is_mention(name.strip()) else name
+
 def err(msg):
     return discord.Embed(title="❌  Error", description=msg, color=C_RED)
 
@@ -128,7 +138,9 @@ async def slash_setup(interaction: discord.Interaction, names: str, group_size: 
     em.add_field(name="📦  Max groups",  value=f"**{max_groups}**",          inline=True)
     em.add_field(name="⏱️  Delay",       value=f"`{delay_desc(delay)}`",     inline=True)
 
-    name_preview = ",  ".join(name_list[:10])
+    # Suppress pings in preview by stripping < > so Discord doesn't resolve them
+    preview_items = [n.replace("<", "\u200b<") for n in name_list[:10]]
+    name_preview = ",  ".join(preview_items)
     if len(name_list) > 10:
         name_preview += f"  …+{len(name_list) - 10} more"
     em.add_field(name="📋  Names loaded", value=f"```{name_preview}```", inline=False)
@@ -232,14 +244,19 @@ async def slash_draw(interaction: discord.Interaction, count: int = 1):
             )
             reveal_em.add_field(
                 name=f"{medal(i)}  Drawn",
-                value=f"```\n{name}\n```",
+                value=display_name(name) if is_mention(name) else f"```\n{name}\n```",
                 inline=False,
             )
             reveal_em.set_footer(text=pool_footer())
-            await interaction.followup.send(embed=reveal_em)
+            # Send as content if mention so Discord actually pings the user
+            ping = name if is_mention(name) else None
+            await interaction.followup.send(content=ping, embed=reveal_em)
 
-        # Group summary
-        summary_lines = "\n".join(f"  {medal(i)}  {n}" for i, n in enumerate(drawn))
+        # Group summary — suppress any pings in the summary embed
+        summary_lines = "\n".join(
+            f"  {medal(i)}  {n.replace('<', chr(0x200b) + '<') if is_mention(n) else n}"
+            for i, n in enumerate(drawn)
+        )
         summary_em = discord.Embed(
             title=f"✅  Group {group_num} complete!",
             description=f"```\n{summary_lines}\n```",
@@ -291,7 +308,9 @@ async def slash_drawremaining(interaction: discord.Interaction):
     pool.clear()
     wheel["groups"][group_num] = drawn
 
-    names_list = "\n".join(f"  🏅  {n}" for n in drawn)
+    names_list = "\n".join(
+        f"  🏅  {n.replace('<', chr(0x200b) + '<') if is_mention(n) else n}" for n in drawn
+    )
     em = discord.Embed(
         title=f"✅  Group {group_num}  (partial — {len(drawn)} name(s))",
         description=f"```\n{names_list}\n```",
@@ -328,7 +347,10 @@ async def slash_groups(interaction: discord.Interaction):
         field_name = f"Group {num}" + (f"  ({label})" if label else "")
         em.add_field(
             name=field_name,
-            value="  ·  ".join(f"{medal(i)} {n}" for i, n in enumerate(names)),
+            value="  ·  ".join(
+                f"{medal(i)} {n.replace('<', chr(0x200b) + '<') if is_mention(n) else n}"
+                for i, n in enumerate(names)
+            ),
             inline=False,
         )
 
