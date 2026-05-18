@@ -238,24 +238,22 @@ async def slash_draw(interaction: discord.Interaction, count: int = 1):
             if i > 0:
                 await asyncio.sleep(get_delay_seconds(is_random, fixed, dmin, dmax))
 
+            # In embed body, mentions render as @username without re-pinging
+            display = name if is_mention(name) else f"**{name}**"
+            group_label = f"Group {group_num}  ·  " if count > 1 else ""
             reveal_em = discord.Embed(
-                title=f"{'Group ' + str(group_num) + '  —  ' if count > 1 else ''}Pick {i + 1} of {size}",
+                title=f"{medal(i)}  {group_label}Pick {i + 1} of {size}",
+                description=f"### {display}",
                 color=C_GOLD,
             )
-            reveal_em.add_field(
-                name=f"{medal(i)}  Drawn",
-                value=display_name(name) if is_mention(name) else f"```\n{name}\n```",
-                inline=False,
-            )
             reveal_em.set_footer(text=pool_footer())
-            # Send as content if mention so Discord actually pings the user
+            # content= triggers the actual ping notification
             ping = name if is_mention(name) else None
             await interaction.followup.send(content=ping, embed=reveal_em)
 
-        # Group summary — suppress any pings in the summary embed
+        # Group summary — embeds render mentions as @username without re-pinging
         summary_lines = "\n".join(
-            f"  {medal(i)}  {n.replace('<', chr(0x200b) + '<') if is_mention(n) else n}"
-            for i, n in enumerate(drawn)
+            f"  {medal(i)}  {n}" for i, n in enumerate(drawn)
         )
         summary_em = discord.Embed(
             title=f"✅  Group {group_num} complete!",
@@ -308,9 +306,7 @@ async def slash_drawremaining(interaction: discord.Interaction):
     pool.clear()
     wheel["groups"][group_num] = drawn
 
-    names_list = "\n".join(
-        f"  🏅  {n.replace('<', chr(0x200b) + '<') if is_mention(n) else n}" for n in drawn
-    )
+    names_list = "\n".join(f"  🏅  {n}" for n in drawn)
     em = discord.Embed(
         title=f"✅  Group {group_num}  (partial — {len(drawn)} name(s))",
         description=f"```\n{names_list}\n```",
@@ -347,10 +343,7 @@ async def slash_groups(interaction: discord.Interaction):
         field_name = f"Group {num}" + (f"  ({label})" if label else "")
         em.add_field(
             name=field_name,
-            value="  ·  ".join(
-                f"{medal(i)} {n.replace('<', chr(0x200b) + '<') if is_mention(n) else n}"
-                for i, n in enumerate(names)
-            ),
+            value="  ·  ".join(f"{medal(i)} {n}" for i, n in enumerate(names)),
             inline=False,
         )
 
