@@ -138,12 +138,12 @@ async def slash_setup(interaction: discord.Interaction, names: str, group_size: 
     em.add_field(name="📦  Max groups",  value=f"**{max_groups}**",          inline=True)
     em.add_field(name="⏱️  Delay",       value=f"`{delay_desc(delay)}`",     inline=True)
 
-    # Suppress pings in preview by stripping < > so Discord doesn't resolve them
-    preview_items = [n.replace("<", "\u200b<") for n in name_list[:10]]
+    # Plain text join — embeds resolve mentions to @username without pinging
+    preview_items = name_list[:10]
     name_preview = ",  ".join(preview_items)
     if len(name_list) > 10:
         name_preview += f"  …+{len(name_list) - 10} more"
-    em.add_field(name="📋  Names loaded", value=f"```{name_preview}```", inline=False)
+    em.add_field(name="📋  Names loaded", value=name_preview, inline=False)
 
     if leftover:
         em.add_field(
@@ -247,8 +247,8 @@ async def slash_draw(interaction: discord.Interaction, count: int = 1):
                 color=C_GOLD,
             )
             reveal_em.set_footer(text=pool_footer())
-            # content= triggers the actual ping notification
-            ping = name if is_mention(name) else None
+            # -# renders as small text in Discord's new markdown; still triggers the ping
+            ping = f"-# {name}" if is_mention(name) else None
             await interaction.followup.send(content=ping, embed=reveal_em)
 
         # Group summary — use plain description (no code block) so mentions resolve to @username
