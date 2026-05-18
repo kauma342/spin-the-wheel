@@ -5,8 +5,8 @@ import random
 import asyncio
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-TOKEN = "MTUwNjAxMzY4MzY2MTE0ODM3MA.Gx1P08.UDuppMgyjB96a2HnhexQ6AEuPlp4_-iWjx60TY"   # ← paste your token here
-
+import os
+TOKEN = os.environ["TOKEN"]
 intents = discord.Intents.default()
 intents.message_content = True
 
