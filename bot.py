@@ -4,6 +4,7 @@ from discord.ext import commands
 import random
 import asyncio
 import os
+import re
 from datetime import datetime
 
 # ── Config ─────────────────────────────────────────────────────────────────────
@@ -21,6 +22,30 @@ class SpinBot(commands.Bot):
         print("✅  Slash commands synced.")
 
 bot = SpinBot()
+
+# ── Auth ───────────────────────────────────────────────────────────────────────
+OWNER_ID = 782306018682994751
+ROLE_ID  = 1062736077921726566
+
+def is_authorized(interaction: discord.Interaction) -> bool:
+    if interaction.user.id == OWNER_ID:
+        return True
+    if interaction.guild:
+        role = interaction.guild.get_role(ROLE_ID)
+        if role and role in interaction.user.roles:
+            return True
+    return False
+
+def no_perms():
+    return discord.Embed(
+        title="🚫  Absolutely not.",
+        description=(
+            "This wheel was crafted for the chosen few.\n"
+            "You, respectfully, are not one of them.\n\n"
+            "-# kindly go touch grass 🌿"
+        ),
+        color=C_RED,
+    )
 
 # ── State ──────────────────────────────────────────────────────────────────────
 wheel = {}
@@ -68,14 +93,12 @@ MEDALS = ["🥇", "🥈", "🥉"]
 def medal(i):
     return MEDALS[i] if i < 3 else "🏅"
 
-import re
 MENTION_RE = re.compile(r"^<@!?(\d+)>$")
 
 def is_mention(name: str) -> bool:
     return bool(MENTION_RE.match(name.strip()))
 
 def display_name(name: str) -> str:
-    """For embeds: show the raw mention string in a code block so it doesn't ping twice."""
     return f"`{name}`" if is_mention(name.strip()) else name
 
 def err(msg):
@@ -102,6 +125,9 @@ async def on_ready():
     delay      = "Seconds between each name reveal — fixed (e.g. 5) or range (e.g. 3-10)",
 )
 async def slash_setup(interaction: discord.Interaction, names: str, group_size: int, delay: str):
+    if not is_authorized(interaction):
+        return await interaction.response.send_message(embed=no_perms(), ephemeral=True)
+
     name_list = [n.strip() for n in names.split(",") if n.strip()]
 
     if not name_list:
@@ -129,16 +155,12 @@ async def slash_setup(interaction: discord.Interaction, names: str, group_size: 
     max_groups = len(name_list) // group_size
     leftover   = len(name_list) % group_size
 
-    em = discord.Embed(
-        title="🎡  Wheel is ready!",
-        color=C_GREEN,
-    )
-    em.add_field(name="👥  Names",       value=f"**{len(name_list)}**",      inline=True)
-    em.add_field(name="🔢  Per group",   value=f"**{group_size}**",          inline=True)
-    em.add_field(name="📦  Max groups",  value=f"**{max_groups}**",          inline=True)
-    em.add_field(name="⏱️  Delay",       value=f"`{delay_desc(delay)}`",     inline=True)
+    em = discord.Embed(title="🎡  Wheel is ready!", color=C_GREEN)
+    em.add_field(name="👥  Names",      value=f"**{len(name_list)}**",  inline=True)
+    em.add_field(name="🔢  Per group",  value=f"**{group_size}**",      inline=True)
+    em.add_field(name="📦  Max groups", value=f"**{max_groups}**",      inline=True)
+    em.add_field(name="⏱️  Delay",      value=f"`{delay_desc(delay)}`", inline=True)
 
-    # Plain text join — embeds resolve mentions to @username without pinging
     preview_items = name_list[:10]
     name_preview = ",  ".join(preview_items)
     if len(name_list) > 10:
@@ -159,13 +181,13 @@ async def slash_setup(interaction: discord.Interaction, names: str, group_size: 
 #  /draw  — draw one OR multiple groups in a row
 # ══════════════════════════════════════════════════════════════════════════════
 @bot.tree.command(name="draw", description="Draw the next group(s) of names from the pool")
-@app_commands.describe(
-    count = "How many groups to draw in a row (default: 1)"
-)
+@app_commands.describe(count="How many groups to draw in a row (default: 1)")
 async def slash_draw(interaction: discord.Interaction, count: int = 1):
+    if not is_authorized(interaction):
+        return await interaction.response.send_message(embed=no_perms(), ephemeral=True)
+
     if not has_wheel():
         return await interaction.response.send_message(embed=err("No wheel set up. Use `/setup` first."), ephemeral=True)
-
     if count < 1:
         return await interaction.response.send_message(embed=err("Count must be at least **1**."), ephemeral=True)
 
@@ -173,9 +195,7 @@ async def slash_draw(interaction: discord.Interaction, count: int = 1):
     size = wheel["group_size"]
 
     if len(pool) == 0:
-        return await interaction.response.send_message(
-            embed=err("The pool is empty! Use `/reset` to start over."), ephemeral=True
-        )
+        return await interaction.response.send_message(embed=err("The pool is empty! Use `/reset` to start over."), ephemeral=True)
     if len(pool) < size:
         em = discord.Embed(
             title="⚠️  Not enough names",
@@ -187,7 +207,6 @@ async def slash_draw(interaction: discord.Interaction, count: int = 1):
         )
         return await interaction.response.send_message(embed=em)
 
-    # Cap count to how many full groups we can actually draw
     max_drawable = len(pool) // size
     if count > max_drawable:
         count = max_drawable
@@ -195,7 +214,6 @@ async def slash_draw(interaction: discord.Interaction, count: int = 1):
     is_random, fixed, dmin, dmax = parse_delay(wheel["delay"])
     d_desc = f"{dmin}–{dmax}s" if is_random else f"{fixed}s"
 
-    # ── Opening message ────────────────────────────────────────────────────────
     open_em = discord.Embed(
         title=f"🎡  Drawing {'group' if count == 1 else f'{count} groups'}…",
         description=f"**{size}** names per group  ·  **{d_desc}** delay between reveals",
@@ -204,9 +222,7 @@ async def slash_draw(interaction: discord.Interaction, count: int = 1):
     open_em.set_footer(text="Spinning the wheel — stand by!")
     await interaction.response.send_message(embed=open_em)
 
-    # ── Draw each group ────────────────────────────────────────────────────────
     for g in range(count):
-        # Stop early if pool runs dry
         if len(pool) < size:
             warn_em = discord.Embed(
                 title="⚠️  Pool ran dry",
@@ -225,20 +241,14 @@ async def slash_draw(interaction: discord.Interaction, count: int = 1):
             pool.remove(name)
         wheel["groups"][group_num] = drawn
 
-        # Separator between multiple groups
         if count > 1:
-            sep_em = discord.Embed(
-                title=f"━━━  Group {group_num}  ━━━",
-                color=C_DARK,
-            )
+            sep_em = discord.Embed(title=f"━━━  Group {group_num}  ━━━", color=C_DARK)
             await interaction.followup.send(embed=sep_em)
 
-        # Reveal names one by one
         for i, name in enumerate(drawn):
             if i > 0:
                 await asyncio.sleep(get_delay_seconds(is_random, fixed, dmin, dmax))
 
-            # In embed body, mentions render as @username without re-pinging
             display = name if is_mention(name) else f"**{name}**"
             group_label = f"Group {group_num}  ·  " if count > 1 else ""
             reveal_em = discord.Embed(
@@ -247,46 +257,35 @@ async def slash_draw(interaction: discord.Interaction, count: int = 1):
                 color=C_GOLD,
             )
             reveal_em.set_footer(text=pool_footer())
-            # -# renders as small text in Discord's new markdown; still triggers the ping
             ping = f"-# {name}" if is_mention(name) else None
             await interaction.followup.send(content=ping, embed=reveal_em)
 
-        # Group summary — use plain description (no code block) so mentions resolve to @username
-        summary_em = discord.Embed(
-            title=f"✅  Group {group_num} complete!",
-            color=C_GREEN,
-        )
+        summary_em = discord.Embed(title=f"✅  Group {group_num} complete!", color=C_GREEN)
         for si, sn in enumerate(drawn):
             summary_em.add_field(name=f"{medal(si)}  Slot {si + 1}", value=sn, inline=True)
         summary_em.set_footer(text=pool_footer() + "  ·  /groups to see all")
 
-        # Add a small pause between groups (before next group's separator)
         if g < count - 1:
             await asyncio.sleep(1.5)
 
         await interaction.followup.send(embed=summary_em)
 
-    # ── Final wrap-up when drawing multiple groups ─────────────────────────────
     if count > 1:
         all_groups = wheel["groups"]
-        wrap_em = discord.Embed(
-            title=f"🏁  All {count} groups drawn!",
-            color=C_TEAL,
-        )
+        wrap_em = discord.Embed(title=f"🏁  All {count} groups drawn!", color=C_TEAL)
         for num, names in list(all_groups.items())[-count:]:
-            wrap_em.add_field(
-                name=f"Group {num}",
-                value="  ·  ".join(names),
-                inline=False,
-            )
+            wrap_em.add_field(name=f"Group {num}", value="  ·  ".join(names), inline=False)
         wrap_em.set_footer(text=pool_footer())
         await interaction.followup.send(embed=wrap_em)
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  /drawremaining  — assign leftover names
+#  /drawremaining
 # ══════════════════════════════════════════════════════════════════════════════
 @bot.tree.command(name="drawremaining", description="Assign the leftover names that don't fill a full group")
 async def slash_drawremaining(interaction: discord.Interaction):
+    if not is_authorized(interaction):
+        return await interaction.response.send_message(embed=no_perms(), ephemeral=True)
+
     if not has_wheel():
         return await interaction.response.send_message(embed=err("No wheel set up. Use `/setup` first."), ephemeral=True)
 
@@ -304,38 +303,32 @@ async def slash_drawremaining(interaction: discord.Interaction):
     pool.clear()
     wheel["groups"][group_num] = drawn
 
-    em = discord.Embed(
-        title=f"✅  Group {group_num}  (partial — {len(drawn)} name(s))",
-        color=C_GREEN,
-    )
+    em = discord.Embed(title=f"✅  Group {group_num}  (partial — {len(drawn)} name(s))", color=C_GREEN)
     for si, sn in enumerate(drawn):
         em.add_field(name=f"🏅  Slot {si + 1}", value=sn, inline=True)
     em.set_footer(text="Pool is now empty  ·  /groups to see all results  ·  /reset to start over")
     await interaction.response.send_message(embed=em)
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  /groups  — show all drawn groups
+#  /groups
 # ══════════════════════════════════════════════════════════════════════════════
 @bot.tree.command(name="groups", description="Show all groups drawn so far")
 async def slash_groups(interaction: discord.Interaction):
+    if not is_authorized(interaction):
+        return await interaction.response.send_message(embed=no_perms(), ephemeral=True)
+
     if not has_wheel():
         return await interaction.response.send_message(embed=err("No wheel set up. Use `/setup` first."), ephemeral=True)
 
     groups = wheel.get("groups", {})
-
     if not groups:
-        em = discord.Embed(
+        return await interaction.response.send_message(embed=discord.Embed(
             title="📋  No groups yet",
             description="Use `/draw` to create the first group.",
             color=C_PURPLE,
-        )
-        return await interaction.response.send_message(embed=em)
+        ))
 
-    em = discord.Embed(
-        title=f"📋  All Groups  —  {len(groups)} drawn",
-        color=C_PURPLE,
-    )
-
+    em = discord.Embed(title=f"📋  All Groups  —  {len(groups)} drawn", color=C_PURPLE)
     for num, names in groups.items():
         label = "partial" if len(names) < wheel["group_size"] else ""
         field_name = f"Group {num}" + (f"  ({label})" if label else "")
@@ -344,16 +337,18 @@ async def slash_groups(interaction: discord.Interaction):
             value="  ·  ".join(f"{medal(i)} {n}" for i, n in enumerate(names)),
             inline=False,
         )
-
     em.set_footer(text=pool_footer())
     await interaction.response.send_message(embed=em)
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  /add  — add names to the pool
+#  /add
 # ══════════════════════════════════════════════════════════════════════════════
 @bot.tree.command(name="add", description="Add names to the pool")
 @app_commands.describe(names="Comma-separated names to add")
 async def slash_add(interaction: discord.Interaction, names: str):
+    if not is_authorized(interaction):
+        return await interaction.response.send_message(embed=no_perms(), ephemeral=True)
+
     if not has_wheel():
         return await interaction.response.send_message(embed=err("No wheel set up. Use `/setup` first."), ephemeral=True)
 
@@ -374,11 +369,14 @@ async def slash_add(interaction: discord.Interaction, names: str):
     await interaction.response.send_message(embed=em)
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  /remove  — remove names from the pool
+#  /remove
 # ══════════════════════════════════════════════════════════════════════════════
 @bot.tree.command(name="remove", description="Remove names from the pool")
 @app_commands.describe(names="Comma-separated names to remove")
 async def slash_remove(interaction: discord.Interaction, names: str):
+    if not is_authorized(interaction):
+        return await interaction.response.send_message(embed=no_perms(), ephemeral=True)
+
     if not has_wheel():
         return await interaction.response.send_message(embed=err("No wheel set up. Use `/setup` first."), ephemeral=True)
 
@@ -398,21 +396,23 @@ async def slash_remove(interaction: discord.Interaction, names: str):
     await interaction.response.send_message(embed=em)
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  /view  — show names still in the pool
+#  /view
 # ══════════════════════════════════════════════════════════════════════════════
 @bot.tree.command(name="view", description="Show all names still in the pool")
 async def slash_view(interaction: discord.Interaction):
+    if not is_authorized(interaction):
+        return await interaction.response.send_message(embed=no_perms(), ephemeral=True)
+
     if not has_wheel():
         return await interaction.response.send_message(embed=err("No wheel set up. Use `/setup` first."), ephemeral=True)
 
     pool = wheel["pool"]
     if not pool:
-        em = discord.Embed(
+        return await interaction.response.send_message(embed=discord.Embed(
             title="🎡  Pool is empty",
             description="Use `/reset` to restore all names, or `/drawremaining` if there were leftovers.",
             color=C_ORANGE,
-        )
-        return await interaction.response.send_message(embed=em)
+        ))
 
     lines = "\n".join(f"  {i+1:>3}.  {n}" for i, n in enumerate(pool))
     em = discord.Embed(
@@ -420,19 +420,21 @@ async def slash_view(interaction: discord.Interaction):
         description=f"```\n{lines}\n```",
         color=C_PURPLE,
     )
-    em.add_field(name="🔢  Per group",       value=f"**{wheel['group_size']}**",       inline=True)
-    em.add_field(name="⏱️  Delay",           value=f"`{delay_desc(wheel['delay'])}`",  inline=True)
-    em.add_field(name="📦  Groups drawn",    value=f"**{len(wheel['groups'])}**",      inline=True)
-
+    em.add_field(name="🔢  Per group",    value=f"**{wheel['group_size']}**",      inline=True)
+    em.add_field(name="⏱️  Delay",        value=f"`{delay_desc(wheel['delay'])}`", inline=True)
+    em.add_field(name="📦  Groups drawn", value=f"**{len(wheel['groups'])}**",     inline=True)
     remaining_groups = len(pool) // wheel["group_size"]
-    em.add_field(name="📊  Groups left",     value=f"**~{remaining_groups}**",         inline=True)
+    em.add_field(name="📊  Groups left",  value=f"**~{remaining_groups}**",        inline=True)
     await interaction.response.send_message(embed=em)
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  /reset  — restore pool to full original list
+#  /reset
 # ══════════════════════════════════════════════════════════════════════════════
 @bot.tree.command(name="reset", description="Restore the pool to the full original list and clear all groups")
 async def slash_reset(interaction: discord.Interaction):
+    if not is_authorized(interaction):
+        return await interaction.response.send_message(embed=no_perms(), ephemeral=True)
+
     if not wheel.get("orig"):
         return await interaction.response.send_message(embed=err("Nothing to reset. Use `/setup` first."), ephemeral=True)
 
@@ -448,24 +450,21 @@ async def slash_reset(interaction: discord.Interaction):
     await interaction.response.send_message(embed=em)
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  /help  — show available commands
+#  /help
 # ══════════════════════════════════════════════════════════════════════════════
 @bot.tree.command(name="help", description="Show all available commands")
 async def slash_help(interaction: discord.Interaction):
-    em = discord.Embed(
-        title="🎡  SpinBot — Commands",
-        color=C_BLUE,
-    )
+    em = discord.Embed(title="🎡  SpinBot — Commands", color=C_BLUE)
     commands_info = [
-        ("`/setup`",          "names, group_size, delay",   "Load names and configure the wheel"),
-        ("`/draw`",           "count (optional)",           "Draw the next group(s) — use `count` to draw multiple in a row"),
-        ("`/drawremaining`",  "—",                          "Assign leftover names that don't fill a full group"),
-        ("`/groups`",         "—",                          "Show all groups drawn so far"),
-        ("`/view`",           "—",                          "Show all names still in the pool"),
-        ("`/add`",            "names",                      "Add names to the pool"),
-        ("`/remove`",         "names",                      "Remove names from the pool"),
-        ("`/reset`",          "—",                          "Restore pool to the original list, clear all groups"),
-        ("`/help`",           "—",                          "Show this message"),
+        ("`/setup`",         "names, group_size, delay", "Load names and configure the wheel"),
+        ("`/draw`",          "count (optional)",         "Draw the next group(s) — use `count` to draw multiple in a row"),
+        ("`/drawremaining`", "—",                        "Assign leftover names that don't fill a full group"),
+        ("`/groups`",        "—",                        "Show all groups drawn so far"),
+        ("`/view`",          "—",                        "Show all names still in the pool"),
+        ("`/add`",           "names",                    "Add names to the pool"),
+        ("`/remove`",        "names",                    "Remove names from the pool"),
+        ("`/reset`",         "—",                        "Restore pool to the original list, clear all groups"),
+        ("`/help`",          "—",                        "Show this message"),
     ]
     for cmd, args, desc in commands_info:
         em.add_field(
