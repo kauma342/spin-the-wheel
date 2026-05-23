@@ -24,7 +24,7 @@ class SpinBot(commands.Bot):
 bot = SpinBot()
 
 # ── Auth ───────────────────────────────────────────────────────────────────────
-OWNER_ID = 782306018682994
+OWNER_ID = 782306018682994751
 ROLE_ID  = 1062736077921726566
 
 def is_authorized(interaction: discord.Interaction) -> bool:
