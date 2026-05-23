@@ -24,7 +24,7 @@ class SpinBot(commands.Bot):
 bot = SpinBot()
 
 # ── Auth ───────────────────────────────────────────────────────────────────────
-OWNER_ID = 782306018682994751
+OWNER_ID = 782306018682994
 ROLE_ID  = 1062736077921726566
 
 def is_authorized(interaction: discord.Interaction) -> bool:
@@ -36,16 +36,34 @@ def is_authorized(interaction: discord.Interaction) -> bool:
             return True
     return False
 
+# ── Ads ───────────────────────────────────────────────────────────────────────
+# Add your image URLs here — one per line. A random one is picked each denial.
+ADS = [
+    "https://media.discordapp.net/attachments/1506036018690658364/1507787771119407224/11.jpg?ex=6a132c49&is=6a11dac9&hm=f868cd621bd03227b6bf85686519573705015406b4b7176021693ab7755719f5&=&format=webp&width=2393&height=1197",
+    "https://media.discordapp.net/attachments/1506036018690658364/1507787771706736731/12.jpg?ex=6a132c4a&is=6a11daca&hm=c4a48caeb88e8a0033bf76d650576412cfd2272715aa576899031dbc8ef38ea3&=&format=webp&width=2393&height=1197",
+    "https://media.discordapp.net/attachments/1506036018690658364/1507787772193411242/13.jpg?ex=6a132c4a&is=6a11daca&hm=326d453c0f7b3eaadd69883f3a91cc59172808c1f6f1b599b954af6ef04186bb&=&format=webp&width=2393&height=1197",
+    "https://media.discordapp.net/attachments/1506036018690658364/1507787792271413248/1.jpg?ex=6a132c4f&is=6a11dacf&hm=50ec6a9637c71200b7e6e5b5bdea851395625a6c097aa9058a33197456da15ec&=&format=webp&width=2393&height=1197",
+    "https://media.discordapp.net/attachments/1506036018690658364/1507787792787177542/2.jpg?ex=6a132c4f&is=6a11dacf&hm=f777b6938c782a633c06782517832a50ca1ac22610474de268170532586cde59&=&format=webp&width=2393&height=1197",
+    "https://media.discordapp.net/attachments/1506036018690658364/1507787793349349487/3.jpg?ex=6a132c4f&is=6a11dacf&hm=82440f8c9ebdd54f74acbb3f0fba1f8da5057a3b75abdda977297e151db48f03&=&format=webp&width=2393&height=1197",
+    "https://media.discordapp.net/attachments/1506036018690658364/1507787794091868229/4.jpg?ex=6a132c4f&is=6a11dacf&hm=2a181dadbe453f1bfefdcc1f18221600acf4349180b8c843a44c3f822852a1af&=&format=webp&width=2393&height=1197",
+    "https://media.discordapp.net/attachments/1506036018690658364/1507787794880139354/5.jpg?ex=6a132c4f&is=6a11dacf&hm=b4a8c3fd2fcce0c18a36f2056781fc3ac9131db212886efc4cf27148ad72f8fe&=&format=webp&width=2393&height=1197",
+    "https://media.discordapp.net/attachments/1506036018690658364/1507787796171985007/7.jpg?ex=6a132c4f&is=6a11dacf&hm=17c3da608af2d9482353d4a925b5ea7903c1c0f4fb6307fa98c20da409406e49&=&format=webp&width=2393&height=1197",
+    "https://media.discordapp.net/attachments/1506036018690658364/1507787796746731520/8.jpg?ex=6a132c50&is=6a11dad0&hm=e92c6688850cb62446f8f3b46bb4a9f7caf02c3d1dc167f5270cca9d7365b48e&=&format=webp&width=2393&height=1197",
+    "https://media.discordapp.net/attachments/1506036018690658364/1507787797514162317/9.jpg?ex=6a132c50&is=6a11dad0&hm=01eaacbfbeaae8200a9c9a53077beae83ba5ce0869e34fdc13dcf8903860b89b&=&format=webp&width=2393&height=1197",
+]
+
 def no_perms():
-    return discord.Embed(
+    em = discord.Embed(
         title="🚫  Absolutely not.",
         description=(
             "This wheel was crafted for the chosen few.\n"
             "You, respectfully, are not one of them.\n\n"
-            "-# kindly go touch grass 🌿"
+            "-# kindly go touch grass and make an article 🌿"
         ),
         color=C_RED,
     )
+    em.set_image(url=random.choice(ADS))
+    return em
 
 # ── State ──────────────────────────────────────────────────────────────────────
 wheel = {}
@@ -126,7 +144,7 @@ async def on_ready():
 )
 async def slash_setup(interaction: discord.Interaction, names: str, group_size: int, delay: str):
     if not is_authorized(interaction):
-        return await interaction.response.send_message(embed=no_perms(), ephemeral=True)
+        return await interaction.response.send_message(embed=no_perms())
 
     name_list = [n.strip() for n in names.split(",") if n.strip()]
 
@@ -184,7 +202,7 @@ async def slash_setup(interaction: discord.Interaction, names: str, group_size: 
 @app_commands.describe(count="How many groups to draw in a row (default: 1)")
 async def slash_draw(interaction: discord.Interaction, count: int = 1):
     if not is_authorized(interaction):
-        return await interaction.response.send_message(embed=no_perms(), ephemeral=True)
+        return await interaction.response.send_message(embed=no_perms())
 
     if not has_wheel():
         return await interaction.response.send_message(embed=err("No wheel set up. Use `/setup` first."), ephemeral=True)
@@ -284,7 +302,7 @@ async def slash_draw(interaction: discord.Interaction, count: int = 1):
 @bot.tree.command(name="drawremaining", description="Assign the leftover names that don't fill a full group")
 async def slash_drawremaining(interaction: discord.Interaction):
     if not is_authorized(interaction):
-        return await interaction.response.send_message(embed=no_perms(), ephemeral=True)
+        return await interaction.response.send_message(embed=no_perms())
 
     if not has_wheel():
         return await interaction.response.send_message(embed=err("No wheel set up. Use `/setup` first."), ephemeral=True)
@@ -315,7 +333,7 @@ async def slash_drawremaining(interaction: discord.Interaction):
 @bot.tree.command(name="groups", description="Show all groups drawn so far")
 async def slash_groups(interaction: discord.Interaction):
     if not is_authorized(interaction):
-        return await interaction.response.send_message(embed=no_perms(), ephemeral=True)
+        return await interaction.response.send_message(embed=no_perms())
 
     if not has_wheel():
         return await interaction.response.send_message(embed=err("No wheel set up. Use `/setup` first."), ephemeral=True)
@@ -347,7 +365,7 @@ async def slash_groups(interaction: discord.Interaction):
 @app_commands.describe(names="Comma-separated names to add")
 async def slash_add(interaction: discord.Interaction, names: str):
     if not is_authorized(interaction):
-        return await interaction.response.send_message(embed=no_perms(), ephemeral=True)
+        return await interaction.response.send_message(embed=no_perms())
 
     if not has_wheel():
         return await interaction.response.send_message(embed=err("No wheel set up. Use `/setup` first."), ephemeral=True)
@@ -375,7 +393,7 @@ async def slash_add(interaction: discord.Interaction, names: str):
 @app_commands.describe(names="Comma-separated names to remove")
 async def slash_remove(interaction: discord.Interaction, names: str):
     if not is_authorized(interaction):
-        return await interaction.response.send_message(embed=no_perms(), ephemeral=True)
+        return await interaction.response.send_message(embed=no_perms())
 
     if not has_wheel():
         return await interaction.response.send_message(embed=err("No wheel set up. Use `/setup` first."), ephemeral=True)
@@ -401,7 +419,7 @@ async def slash_remove(interaction: discord.Interaction, names: str):
 @bot.tree.command(name="view", description="Show all names still in the pool")
 async def slash_view(interaction: discord.Interaction):
     if not is_authorized(interaction):
-        return await interaction.response.send_message(embed=no_perms(), ephemeral=True)
+        return await interaction.response.send_message(embed=no_perms())
 
     if not has_wheel():
         return await interaction.response.send_message(embed=err("No wheel set up. Use `/setup` first."), ephemeral=True)
@@ -433,7 +451,7 @@ async def slash_view(interaction: discord.Interaction):
 @bot.tree.command(name="reset", description="Restore the pool to the full original list and clear all groups")
 async def slash_reset(interaction: discord.Interaction):
     if not is_authorized(interaction):
-        return await interaction.response.send_message(embed=no_perms(), ephemeral=True)
+        return await interaction.response.send_message(embed=no_perms())
 
     if not wheel.get("orig"):
         return await interaction.response.send_message(embed=err("Nothing to reset. Use `/setup` first."), ephemeral=True)
